@@ -1,4 +1,4 @@
-**Multi-GPU Training**
+**Multi-GPU Training DDP**
 
 If you are using torch2.0, you can use the following command to run the training script:
 
@@ -13,3 +13,8 @@ The two commands work in my side. The transformers library still suggest use tor
 ```ValueError: Some specified arguments are not used by the HfArgumentParser: ['--local-rank=1']```
 
 with torch2.0. It is suggested to use torchrun based on [this thread](https://github.com/huggingface/transformers/issues/22171).
+
+
+**Use single GPU when the server has multiple GPUs**
+
+Sometimes we do not wish to use all the GPUs on the server. See 
