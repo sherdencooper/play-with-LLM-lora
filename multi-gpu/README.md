@@ -12,4 +12,4 @@ The two commands work in my side. The transformers library still suggest use tor
 
 ```ValueError: Some specified arguments are not used by the HfArgumentParser: ['--local-rank=1']```
 
-It is suggested to use torchrun based on [this thread](https://github.com/huggingface/transformers/issues/22171).
+with torch2.0. It is suggested to use torchrun based on [this thread](https://github.com/huggingface/transformers/issues/22171).
