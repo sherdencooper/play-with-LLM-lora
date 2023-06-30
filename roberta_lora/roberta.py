@@ -1,5 +1,7 @@
 import logging
 import os
+os.environ["WANDB_PROJECT"] = "lora_test_roberta"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import random
 import sys
 from dataclasses import dataclass, field
@@ -38,8 +40,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
 from sklearn.metrics import confusion_matrix
-os.environ["WANDB_PROJECT"] = "lora_test"
-os.environ["INVISIBLE_GPU"] = "0"
+
 
 
 require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/text-classification/requirements.txt")
@@ -223,6 +224,7 @@ def main():
     training_args.logging_steps=10
     training_args.save_steps=20
     training_args.group_by_length=True
+    device_map = "auto"
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
@@ -387,6 +389,7 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
         ignore_mismatched_sizes=model_args.ignore_mismatched_sizes,
+        device_map = device_map,
     )
 
     # Preprocessing the raw_datasets
