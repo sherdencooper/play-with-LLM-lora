@@ -1,0 +1,2 @@
+## Training Epoch for Lora
+According to [issue 622](https://github.com/huggingface/peft/issues/622#issuecomment-1609499102) and the roberta-large lora training curve in [wandb project]((https://wandb.ai/alpha_ai/lora_test_roberta/workspace?workspace=)), it needs longer training epoch to get the best performance for LoRA. Thus I set 10 epoch for full finetune and 15 epoch for LoRA. 
