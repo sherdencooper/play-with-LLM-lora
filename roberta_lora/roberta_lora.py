@@ -219,7 +219,7 @@ def main():
     training_args.eval_steps = 20
     training_args.evaluation_strategy='steps'
     training_args.gradient_accumulation_steps=5
-    training_args.num_train_epochs=10
+    training_args.num_train_epochs=20
     training_args.learning_rate=5e-5
     training_args.warmup_ratio=0.1
     training_args.logging_steps=10
