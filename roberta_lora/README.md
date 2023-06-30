@@ -11,14 +11,40 @@ If you are unfamiliar with parallel training, here is a short description genera
 
 All running cases in 2 * A100 80GB server:
 - [x] Full finetune in a single GPU (no accelerate)
+- [x] Full finetune DDP
+- [x] Full finetune PP
+- [x] LoRA Single GPU
+- [x] LoRA PP
 
 |  Setting  | GPU | Epoch | BestEvalAcc | GPU Usage     | Time    |
 |:---------:|:---:|-------|-------------|---------------|---------|
 | SingleGPU | 1   | 10    | 97.75%      | 34.5GB        | 22.5min |
 | DDP       | 2   | 10    | 97.07%      | 34.5GB/34.5GB | 11.5min |
+| PP        | 2   | 10    | 97.52%      | 14.9GB/19.6GB | 23.5min |
 | LoRA      | 1   | 15    | 96.85%      | 26.5GB        | 17.5min |
+| LoRA-DDP  | 2   | 15    | 95.27%      | 26.6GB/46.3GB | 8.4min  |
+| LoRA-PP   | 2   | 15    | 96.62%      | 12.3GB/16.2GB | 18.5min |
 
 ## Full finetune in a single GPU (no accelerate)
 
 Uncomment the 4th line in roberta.py to use a single GPU. 
 
+## Full finetune DDP
+
+```torchrun --nproc_per_node 2 roberta.py```
+
+## Full finetune PP
+
+directly run ```python roberta.py```
+
+## LoRA Single GPU
+
+Uncomment the 4th line in roberta_lora.py to use a single GPU.
+
+## LoRA PP
+
+directly run ```python roberta_lora.py```
+
+## LoRA DDP
+
+```torchrun --nproc_per_node 2 roberta_lora.py```

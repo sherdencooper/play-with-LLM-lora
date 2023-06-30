@@ -7,7 +7,7 @@ If you feel better to manage multi-GPU training by yourself, you can refer to th
 Sometimes you may want to run the training script in a single GPU even if you have multiple GPUs. You could set ```os.environ["CUDA_VISIBLE_DEVICES"] = "0"``` on top of the training script. Remember to set this before importing torch and transformers otherwise it will not work and running the script will still use all the GPUs.
 
 ### Multi-GPU DDP
-Transformers trainer will automatically use DDP and use all the GPUs available so you can just run ```python script.py```. You can also use the following methods to manually run the DDP:
+Transformers trainer will automatically use PP and use all the GPUs available so you can just run ```python script.py``` by setting ```device_map = "auto"```. You can use the following methods to run the DDP:
 
 If you are using torch2.0, you can use the following command to run the training script:
 
