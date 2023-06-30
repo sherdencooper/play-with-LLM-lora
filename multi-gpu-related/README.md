@@ -1,4 +1,13 @@
-**Multi-GPU Training DDP**
+# Multi-GPU-Related Notes
+
+## Multi-GPU Training without Accelerate
+If you feel better to manage multi-GPU training by yourself, you can refer to the following notes.
+
+### Single GPU Training
+Sometimes you may want to run the training script in a single GPU even if you have multiple GPUs. You could set ```os.environ["CUDA_VISIBLE_DEVICES"] = "0"``` on top of the training script. Remember to set this before importing torch and transformers otherwise it will not work and running the script will still use all the GPUs.
+
+### Multi-GPU DDP
+Transformers trainer will automatically use DDP and use all the GPUs available so you can just run ```python script.py```. You can also use the following methods to manually run the DDP:
 
 If you are using torch2.0, you can use the following command to run the training script:
 
@@ -12,9 +21,9 @@ The two commands work in my side. The transformers library still suggest use tor
 
 ```ValueError: Some specified arguments are not used by the HfArgumentParser: ['--local-rank=1']```
 
-with torch2.0. It is suggested to use torchrun based on [this thread](https://github.com/huggingface/transformers/issues/22171).
+With torch2.0. It is suggested to use torchrun based on [this thread](https://github.com/huggingface/transformers/issues/22171). Also, it is more recommended to use torch2 since there are tons of new features which can accelerate the training process.
 
 
-**Use single GPU when the server has multiple GPUs**
+**Multi-GPU Training with Accelerate**
 
-Sometimes we do not wish to use all the GPUs on the server. See 
+It would be much easier to use accelerate to manage multi-GPU training.
