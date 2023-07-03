@@ -48,3 +48,5 @@ directly run ```python roberta_lora.py```
 ## LoRA DDP
 
 ```torchrun --nproc_per_node 2 roberta_lora.py```
+
+The GPU usage is not as expected and I have posted the [issue here](https://github.com/huggingface/peft/issues/655).
