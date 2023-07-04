@@ -1,6 +1,6 @@
 import logging
 import os
-os.environ["WANDB_PROJECT"] = "lora_test"
+os.environ["WANDB_PROJECT"] = "lora_test_roberta"
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import random
 import sys
@@ -11,7 +11,7 @@ import datasets
 import evaluate
 import numpy as np
 from datasets import load_dataset
-
+from accelerate import Accelerator
 import transformers
 from transformers import (
     AutoConfig,
@@ -219,12 +219,25 @@ def main():
     training_args.eval_steps = 20
     training_args.evaluation_strategy='steps'
     training_args.gradient_accumulation_steps=5
-    training_args.num_train_epochs=20
+    training_args.num_train_epochs=15
     training_args.learning_rate=5e-5
     training_args.warmup_ratio=0.1
     training_args.logging_steps=10
     training_args.save_steps=20
     training_args.group_by_length=True
+
+
+    # Distributed setting
+    world_size = int(os.environ.get("WORLD_SIZE", 1))
+    ddp = world_size != 1
+    # training_args.ddp_find_unused_parameters = False if ddp else None
+    device_map = "auto"
+    # if we are in a distributed setting, we need to set the device map and max memory per device
+    if os.environ.get('LOCAL_RANK') is not None:
+        local_rank = int(os.environ.get('LOCAL_RANK', '0'))
+        # device_map = {'': local_rank}
+        device_map={"":Accelerator().process_index}
+
     peft_type = PeftType.LORA
     peft_config = LoraConfig(task_type="SEQ_CLS", inference_mode=False, r=8, lora_alpha=16, lora_dropout=0.1)
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
@@ -390,7 +403,7 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
         ignore_mismatched_sizes=model_args.ignore_mismatched_sizes,
-        device_map='auto'
+        device_map=device_map
     )
 
     model = get_peft_model(model, peft_config)

@@ -15,6 +15,10 @@ All running cases in 2 * A100 80GB server:
 - [x] Full finetune PP
 - [x] LoRA Single GPU
 - [x] LoRA PP
+- [x] LoRA DDP
+- [x] QLoRA Single GPU
+- [x] QLoRA PP
+- [ ] QLoRA DDP
 
 |  Setting  | GPU | Epoch | BestEvalAcc | GPU Usage     | Time    |
 |:---------:|:---:|-------|-------------|---------------|---------|
@@ -24,6 +28,8 @@ All running cases in 2 * A100 80GB server:
 | LoRA      | 1   | 15    | 96.85%      | 26.5GB        | 17.5min |
 | LoRA-DDP  | 2   | 15    | 95.27%      | 26.6GB/46.3GB | 8.4min  |
 | LoRA-PP   | 2   | 15    | 96.62%      | 12.3GB/16.2GB | 18.5min |
+| QLoRA     | 1   | 15    | 96.62%      | 4.9GB         | 20min   |
+| QLoRA-PP  | 2   | 15    | 96.6%       | 4G/4G         | 19.5min |
 
 ## Full finetune in a single GPU (no accelerate)
 
@@ -50,3 +56,15 @@ directly run ```python roberta_lora.py```
 ```torchrun --nproc_per_node 2 roberta_lora.py```
 
 The GPU usage is not as expected and I have posted the [issue here](https://github.com/huggingface/peft/issues/655).
+
+## QLoRA Single GPU
+
+Uncomment the 4th line in roberta_qlora.py to use a single GPU.
+
+## QLoRA PP
+
+directly run ```python roberta_qlora.py```
+
+## QLoRA DDP
+
+I met some problems with running DDP for RoBERTA QLoRA. Although setting ```training_args.ddp_find_unused_parameters = False```, it still has the error. I tried disable gradient checkpointing and it could run, however, in this case it uses more GPU memory than the original LoRA (see [here](https://github.com/artidoro/qlora/issues/12)]) I will update if I could get it work.

@@ -1,7 +1,7 @@
 import logging
 import os
 os.environ["WANDB_PROJECT"] = "lora_test_roberta"
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import random
 import sys
 from dataclasses import dataclass, field
@@ -11,7 +11,7 @@ import datasets
 import evaluate
 import numpy as np
 from datasets import load_dataset
-
+import bitsandbytes as bnb
 import transformers
 from transformers import (
     AutoConfig,
@@ -24,8 +24,10 @@ from transformers import (
     Trainer,
     TrainingArguments,
     default_data_collator,
+    BitsAndBytesConfig,
     set_seed,
 )
+import torch
 from peft import (
     get_peft_config,
     get_peft_model,
@@ -35,13 +37,16 @@ from peft import (
     PeftType,
     PrefixTuningConfig,
     PromptEncoderConfig,
+    prepare_model_for_kbit_training,
 )
+from peft.tuners.lora import LoraLayer
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
 from sklearn.metrics import confusion_matrix
-
-
+from collections import defaultdict
+# Will error if the minimal version of Transformers is not installed. Remove at your own risks.
+# check_min_version("4.29.0.dev0")
 
 require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/text-classification/requirements.txt")
 
@@ -59,6 +64,41 @@ task_to_keys = {
 
 logger = logging.getLogger(__name__)
 
+def verify_model_dtype(model):
+    """
+    查看模型种各种类型的参数的情况
+    """
+    dtype2param_num = defaultdict(int)  # 每种数据类型的参数量
+    dtype2param_name = defaultdict(list)  # 每种数据类型的参数名称
+    dtype2trainable_param_num = defaultdict(int)  # 每种数据类型参与训练的参数量
+    dtype2trainable_param_name = defaultdict(list)  # 每种数据类型参与训练的参数名称
+    for name, p in model.named_parameters():
+        dtype = p.dtype
+        dtype2param_num[dtype] += p.numel()
+        dtype2param_name[dtype].append(name)
+        if p.requires_grad:
+            dtype2trainable_param_num[dtype] += p.numel()
+            dtype2trainable_param_name[dtype].append(name)
+    # 统计全部参数中，各种类型参数分布
+    total = 0
+    print('verify all params of the model')
+    for k, v in dtype2param_num.items():
+        total += v
+    for k, v in dtype2param_num.items():
+        print(k, v, v / total)
+    for k, v in dtype2trainable_param_name.items():
+        print(k, v)
+
+    print()
+    # 统计可训练参数中，各种类型参数分布
+    print('verify trainable params the model')
+    total_trainable = 0
+    for k, v in dtype2trainable_param_num.items():
+        total_trainable += v
+    for k, v in dtype2trainable_param_num.items():
+        print(k, v, v / total_trainable)
+    for k, v in dtype2trainable_param_num.items():
+        print(k, v)
 
 @dataclass
 class DataTrainingArguments:
@@ -195,6 +235,18 @@ class ModelArguments:
         metadata={"help": "Will enable to load a pretrained model whose head dimensions are different."},
     )
 
+def find_all_linear_names(model):
+    cls = bnb.nn.Linear4bit 
+    lora_module_names = set()
+    for name, module in model.named_modules():
+        if isinstance(module, cls):
+            names = name.split('.')
+            lora_module_names.add(names[0] if len(names) == 1 else names[-1])
+
+
+    if 'lm_head' in lora_module_names: # needed for 16-bit
+        lora_module_names.remove('lm_head')
+    return list(lora_module_names)
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -218,14 +270,27 @@ def main():
     training_args.eval_steps = 20
     training_args.evaluation_strategy='steps'
     training_args.gradient_accumulation_steps=5
-    training_args.num_train_epochs=10
+    training_args.num_train_epochs=15
     training_args.learning_rate=5e-5
     training_args.warmup_ratio=0.1
     training_args.logging_steps=10
     training_args.save_steps=20
     training_args.group_by_length=True
-    device_map = "auto"
+    training_args.optim="paged_adamw_32bit"
+    training_args.bf16=True
 
+    # Distributed setting
+    world_size = int(os.environ.get("WORLD_SIZE", 1))
+    ddp = world_size != 1
+    # training_args.ddp_find_unused_parameters = False if ddp else None
+    device_map = "auto"
+    # if we are in a distributed setting, we need to set the device map and max memory per device
+    if os.environ.get('LOCAL_RANK') is not None:
+        local_rank = int(os.environ.get('LOCAL_RANK', '0'))
+        device_map = {'': local_rank}
+        # device_map={"":Accelerator().process_index}
+
+    
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
     send_example_telemetry("run_glue", model_args, data_args)
@@ -389,8 +454,38 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
         ignore_mismatched_sizes=model_args.ignore_mismatched_sizes,
-        device_map = device_map,
+        device_map=device_map,
+        quantization_config=BitsAndBytesConfig(
+            load_in_4bit=True,
+            llm_int8_threshold=6.0,
+            llm_int8_has_fp16_weight=False,
+            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type='nf4',
+        ),
+        load_in_4bit=True,
+        torch_dtype=torch.bfloat16,
+        trust_remote_code=True,
     )
+    model.config.torch_dtype=torch.bfloat16
+    model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
+    model.gradient_checkpointing_enable()
+    modules = find_all_linear_names(model)
+    peft_type = PeftType.LORA
+    peft_config = LoraConfig(task_type="SEQ_CLS", inference_mode=False, r=8, lora_alpha=16, lora_dropout=0.1, target_modules=modules)
+    model = get_peft_model(model, peft_config)
+    model.print_trainable_parameters()
+    # for name, module in model.named_modules():
+    #     if isinstance(module, LoraLayer):
+    #         if training_args.bf16:
+    #             module = module.to(torch.bfloat16)
+    #     if 'norm' in name:
+    #         module = module.to(torch.float32)
+    #     if 'lm_head' in name or 'embed_tokens' in name:
+    #         if hasattr(module, 'weight'):
+    #             if training_args.bf16 and module.weight.dtype == torch.float32:
+    #                 module = module.to(torch.bfloat16)
+    verify_model_dtype(model)
 
     # Preprocessing the raw_datasets
     if data_args.task_name is not None:
@@ -529,7 +624,7 @@ def main():
     # we already did the padding.
     if data_args.pad_to_max_length:
         data_collator = default_data_collator
-    elif training_args.fp16:
+    elif training_args.fp16 or training_args.bf16:
         data_collator = DataCollatorWithPadding(tokenizer, pad_to_multiple_of=8)
     else:
         data_collator = None
