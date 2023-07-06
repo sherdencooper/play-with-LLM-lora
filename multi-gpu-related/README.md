@@ -27,3 +27,7 @@ With torch2.0. It is suggested to use torchrun based on [this thread](https://gi
 **Multi-GPU Training with Accelerate**
 
 It would be much easier to use accelerate to manage multi-GPU training.
+
+Since DeepSpeed ZeRO 3 does not support 4/8 bit optimization, ZeRO 2 is recommended to use. Also, according to [this repo]{https://github.com/lich99/ChatGLM-finetune-LoRA}, try ZeRO 2 and no offload first, unless you encounter OOM.
+
+```ZeRO 2 (no offload) > ZeRO 2 (offload) > ZeRO 3 (no offload) > ZeRO 3 (offload)```
